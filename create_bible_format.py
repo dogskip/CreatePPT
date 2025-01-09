@@ -6,6 +6,9 @@ from pptx.enum.text import PP_ALIGN
 from pptx.util import Pt, Inches
 from pptx.dml.color import RGBColor
 
+# 로깅 설정
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 class ChangeBibleFormat:
     def __init__(self, text_file_path, bible_path, output_path, ppt_title):
         self.text_file_path = text_file_path
@@ -94,7 +97,7 @@ class ChangeBibleFormat:
                     return None
                 for subfolder in os.listdir(path_without_bible_name):
                     if subfolder.endswith(book):
-                        full_path = os.path.join(self.bible_path, testament, subfolder)
+                        full_path = os.path.join(testament, subfolder)
                         logging.info(f"Book path found: {full_path}")
                         return full_path
         logging.error(f"책 이름을 경로로 변경할 수 없습니다: {book}")
@@ -104,7 +107,7 @@ class ChangeBibleFormat:
         book_path = self.change_book_names_to_path(book)
         if not book_path:
             raise ValueError(f"책 경로를 찾을 수 없습니다: {book}")
-        ppt_file_path = os.path.join(book_path, f"{book}{chapter}장.pptx")
+        ppt_file_path = os.path.join(self.bible_path, book_path, f"{book}{chapter}장.pptx")
         split_name = expanded_verse.split(" ")
         full_bible_name = ""
         for korean_name, english_name in self.english_book_names.items():
@@ -191,7 +194,7 @@ class ChangeBibleFormat:
                 raise ValueError("Invalid verse format. Use 'Book Chapter:Verse-Verse'.")
 
             book_path = self.change_book_names_to_path(book)
-            ppt_file_path = os.path.join(book_path, f"{book}{chapter}장.pptx")
+            ppt_file_path = os.path.join(self.bible_path, book_path, f"{book}{chapter}장.pptx")
             if not os.path.exists(ppt_file_path):
                 logging.error(f"PPT 파일이 존재하지 않습니다: {ppt_file_path}")
                 raise FileNotFoundError(f"PPT 파일이 존재하지 않습니다: {ppt_file_path}")
@@ -294,4 +297,4 @@ class ChangeBibleFormat:
 
         except Exception as e:
             logging.error(f"에러 발생: {e}")
-            raise e  # 예외를 상위로 전달
+            raise e

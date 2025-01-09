@@ -1,0 +1,113 @@
+<!-- templates/change_lyrics_operations.html -->
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>가사 PPT 생성 - {{ operation.replace('_', ' ').capitalize() }}</title>
+    <style>
+        /* 기존 스타일과 유사하게 유지 */
+        body {
+            font-family: '나눔고딕', sans-serif;
+            background-color: #f0f8ff;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        input[type="text"], input[type="file"], select {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0 15px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        label {
+            font-weight: bold;
+        }
+        .btn {
+            background-color: lightblue;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        }
+        .btn:hover {
+            background-color: deepskyblue;
+        }
+        .alert {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
+        .alert-warning {
+            background-color: #ff9800;
+            color: white;
+        }
+        .alert-danger {
+            background-color: #f44336;
+            color: white;
+        }
+        .alert-success {
+            background-color: #4caf50;
+            color: white;
+        }
+    </style>
+    <script>
+        // 자바스크립트를 이용해 작업에 따라 PPT 파일 업로드 필드를 동적으로 표시
+        function togglePptFileField(operation) {
+            const pptFileField = document.getElementById('ppt_file_field');
+            const operationsRequiringPpt = ['change_lyrics', 'change_only_korean_lyrics', 'change_only_english_lyrics'];
+            if (operationsRequiringPpt.includes(operation)) {
+                pptFileField.style.display = 'block';
+            } else {
+                pptFileField.style.display = 'none';
+            }
+        }
+        window.onload = function() {
+            const operation = "{{ operation }}";
+            togglePptFileField(operation);
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h2>가사 PPT 생성 - {{ operation.replace('_', ' ').capitalize() }}</h2>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }}">
+                {{ message }}
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" enctype="multipart/form-data">
+            <label for="text_file">가사 파일 (.txt)</label>
+            <input type="file" id="text_file" name="text_file" accept=".txt" required>
+
+            <!-- PPT 파일 업로드 필드 (일부 작업에만 필요) -->
+            <div id="ppt_file_field" style="display: none;">
+                <label for="ppt_file">기존 PPT 파일 (.pptx)</label>
+                <input type="file" id="ppt_file" name="ppt_file" accept=".pptx">
+            </div>
+
+            <label for="ppt_title">PPT 제목</label>
+            <input type="text" id="ppt_title" name="ppt_title" placeholder="PPT 제목을 입력하세요" required>
+
+            <button type="submit" class="btn">PPT 생성</button>
+        </form>
+
+        <a href="{{ url_for('change_lyrics_menu') }}" class="btn" style="background-color: grey; margin-top: 10px;">작업 메뉴로 돌아가기</a>
+    </div>
+</body>
+</html>

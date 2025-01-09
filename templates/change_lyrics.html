@@ -1,12 +1,10 @@
-<!-- templates/index.html -->
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>말씀 PPT 생성기</title>
+    <title>가사 PPT 생성</title>
     <style>
-        /* 기본 스타일 */
+        /* 기존 스타일과 유사하게 유지 */
         body {
             font-family: '나눔고딕', sans-serif;
             background-color: #f0f8ff;
@@ -20,9 +18,6 @@
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
             text-align: center;
-        }
-        .menu {
-            width: 500px;
         }
         .btn {
             background-color: lightblue;
@@ -60,7 +55,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>말씀 PPT 생성기</h1>
+        <h2>가사 PPT 생성</h2>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
@@ -71,10 +66,15 @@
             {% endfor %}
           {% endif %}
         {% endwith %}
-        <div class="menu">
-            <a href="{{ url_for('create_bible_format_route') }}" class="btn">성경 형식 PPT 생성</a>
-            <a href="{{ url_for('change_lyrics_menu') }}" class="btn">가사 PPT 생성</a>
-        </div>
+
+        <a href="{{ url_for('change_lyrics_route', operation='change_lyrics') }}" class="btn">가사 변경</a>
+        <a href="{{ url_for('change_lyrics_route', operation='change_only_korean_lyrics') }}" class="btn">기존 ppt에서 한글 가사만 변경</a>
+        <a href="{{ url_for('change_lyrics_route', operation='change_only_english_lyrics') }}" class="btn">기존 ppt에서 영어 가사만 변경</a>
+        <a href="{{ url_for('change_lyrics_route', operation='create_lyrics') }}" class="btn">가사 PPT 생성</a>
+        <a href="{{ url_for('change_lyrics_route', operation='create_only_korean_lyrics') }}" class="btn">한글 가사 PPT 생성</a>
+        <a href="{{ url_for('change_lyrics_route', operation='create_only_english_lyrics') }}" class="btn">영어 가사 PPT 생성</a>
+        <a href="{{ url_for('change_lyrics_route', operation='create_seoul_form') }}" class="btn">서울 형식 PPT 생성</a>
+        <a href="{{ url_for('index') }}" class="btn" style="background-color: grey; margin-top: 10px;">메인 메뉴로 돌아가기</a>
     </div>
 </body>
 </html>
