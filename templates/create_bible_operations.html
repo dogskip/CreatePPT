@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>말씀 PPT 생성</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.3.0/css/all.min.css"
+    />
+</head>
+<body>
+    <div class="container">
+        <div class="title">
+            <h2>말씀 PPT 생성</h2>
+            <button class="cancel" onclick="window.location.href='{{ url_for('create_bible_menu') }}'">
+		<i class="fa-solid fa-xmark fa-2xl"></i>
+	    </button>
+        </div>
+        <form method="POST" enctype="multipart/form-data">
+            <label for="text_file">설교노트 파일 (.txt, .rtf)</label>
+            <input type="file" id="text_file" name="text_file" accept=".txt" required>
+            <label for="version_set">버전 선택</label>
+            <select id="version_set" name="version_set" required>
+                <option value="">-- 버전을 선택하세요 --</option>
+                {% for version in version_sets %}
+                    <option value="{{ version }}">{{ version }}</option>
+                {% endfor %}
+            </select>
+            <label for="ppt_title">PPT 제목</label>
+            <input type="text" id="ppt_title" name="ppt_title" placeholder="PPT 제목을 입력하세요" required>
+            <button type="submit" class="btn">PPT 생성</button>
+        </form>
+    </div>
+</body>
+</html>

@@ -1,40 +1,54 @@
-<!-- templates/index.html -->
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>말씀 PPT 생성기</title>
+    <title>종합 PPT 생성기</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.3.0/css/all.min.css"
+    />
     <style>
         /* 기본 스타일 */
+        * {
+            box-sizing: border-box;
+        }
         body {
             font-family: '나눔고딕', sans-serif;
             background-color: #f0f8ff;
-            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
         }
         .container {
+            width: 90%;
             max-width: 600px;
-            margin: auto;
+            margin: 0 auto;
             background: white;
             padding: 30px;
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
             text-align: center;
+            overflow: hidden; /* 버튼이 박스에서 넘어가지 않도록 */
         }
         .menu {
-            width: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 20px;
         }
         .btn {
             background-color: lightblue;
             color: white;
             padding: 15px 25px;
-            margin: 10px;
             border: none;
             border-radius: 5px;
             cursor: pointer;
             text-decoration: none;
-            display: inline-block;
             width: 100%;
+            transition: background-color 0.3s;
         }
         .btn:hover {
             background-color: deepskyblue;
@@ -60,7 +74,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>말씀 PPT 생성기</h1>
+        <h1>종합 PPT 생성기</h1>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
@@ -72,7 +86,7 @@
           {% endif %}
         {% endwith %}
         <div class="menu">
-            <a href="{{ url_for('create_bible_format_route') }}" class="btn">성경 형식 PPT 생성</a>
+            <a href="{{ url_for('create_bible_menu') }}" class="btn">말씀 PPT 생성</a>
             <a href="{{ url_for('change_lyrics_menu') }}" class="btn">가사 PPT 생성</a>
         </div>
     </div>

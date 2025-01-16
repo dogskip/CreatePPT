@@ -37,6 +37,10 @@ class ChangeLyrics:
     def setting_slide_layout(self, prs):
         # 슬라이드 레이아웃 선택(빈 슬라이드)
         slide_layout = prs.slide_layouts[6]
+        background = slide_layout.background
+        fill = background.fill
+        fill.solid()
+        fill.fore_color.rgb = RGB(0,0,0)
         return slide_layout
 
     def create_text_box(self, left, top, width, height):

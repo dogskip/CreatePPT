@@ -3,24 +3,50 @@ from werkzeug.utils import secure_filename
 import os
 import logging
 import uuid
+import json
 from create_bible_format import ChangeBibleFormat
+from other_church import ChangeBibleFormat2
 from create_song_form import ChangeLyrics
-from google.cloud import storage
+from google.cloud import storage, secretmanager
+from google.oauth2 import service_account
+from datetime import timedelta
 
 # Flask 애플리케이션 초기화
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', '3dce87f15d8d20bd3e3b80c6fe349bb997497a8899c4cd780076a7be653739d7')  # 환경 변수에서 가져오기
 
 # Cloud Storage 설정
-GCS_BUCKET = os.environ.get('GCS_BUCKET')  # 환경 변수로 설정
+def access_secret_version(project_id, secret_id, version_id="latest"):
+    """
+    Access the payload for the given secret version if one exists.
+    The version_id defaults to "latest" if not provided.
+    """
+
+    # Create the Secret Manager client.
+    client = secretmanager.SecretManagerServiceClient()
+
+    # Build the resource name of the secret version.
+    name = f"projects/{project_id}/secrets/{secret_id}/versions/{version_id}"
+
+    # Access the secret version.
+    response = client.access_secret_version(request={"name": name})
+
+    payload = response.payload.data.decode("UTF-8")
+    return payload
+
 storage_client = storage.Client()
+GCS_BUCKET = os.environ.get('GCS_BUCKET')  # 환경 변수로 설정
+if not GCS_BUCKET:
+    print("ERROR: GCS_BUCKET environment variable is NOT set!")
+    raise ValueError("GCS_BUCKET environment variable is NOT set!")
+
+print(f"Bucket name from environment: '{GCS_BUCKET}'")
 bucket = storage_client.bucket(GCS_BUCKET)
 
 # 폴더 설정
 UPLOAD_FOLDER = 'uploads'  # 현재는 사용하지 않음, 필요 시 유지
 BIBLE_PPT_FOLDER = 'bible_ppts'
 OUTPUT_FOLDER = 'output'
-ALLOWED_TEXT_EXTENSIONS = {'txt'}
+ALLOWED_TEXT_EXTENSIONS = {'txt','rtf'}
 ALLOWED_PPT_EXTENSIONS = {'pptx'}
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -50,39 +76,56 @@ def get_version_sets():
     return version_sets
 
 # 파일을 GCS에 업로드하는 함수
-def upload_to_gcs(source_file_path, destination_blob_name):
+def upload_to_gcs(bucket_name, source_file_path, destination_blob_name):
     try:
+        # Secret Manager에서 서비스 계정 키 가져오기
+        project_id = "durable-epoch-447213-c5" # 프로젝트 ID
+        secret_id = "GOOGLE_APPLICATION_CREDENTIALS_JSON" # Secret Manager에 생성한 비밀 이름
+        credentials_json = access_secret_version(project_id, secret_id)
+
+        # JSON 문자열을 사용하여 자격 증명 생성
+        credentials = service_account.Credentials.from_service_account_info(json.loads(credentials_json))
+
+        storage_client = storage.Client(credentials=credentials)
+        bucket = storage_client.bucket(bucket_name)
         blob = bucket.blob(destination_blob_name)
         blob.upload_from_filename(source_file_path)
-        blob.make_public()  # 공개적으로 접근 가능하게 설정 (필요 시)
-        return blob.public_url
+        signed_url = blob.generate_signed_url(expiration=timedelta(minutes=15))
+        return signed_url
     except Exception as e:
-            logging.error(f"Google Cloud Storage 업로드 실패: {e}")
-            raise e
+        logging.error(f"Google Cloud Storage 업로드 실패: {e}")
+        raise e
 
 # 루트 라우트: 파일 업로드 및 입력 폼
 @app.route('/', methods=['GET', 'POST'])
 def index():
     return render_template('index.html')
 
-# ChangeBibleFormat 라우트
-# @app.route('/create_bible_format', methods=['GET'])
-# def create_bible_format_menu():
-#     return render_template('create_bible_format.html')
-@app.route('/create_bible_format', methods=['GET', 'POST'])
-def create_bible_format_route():
+# 말씀 PPT 생성 메뉴 라우트
+@app.route('/create_bible_menu', methods=['GET'])
+def create_bible_menu():
+    return render_template('create_bible_menu.html')
+
+# 말씀 PPT 생성 작업별 라우트
+@app.route('/create_bible_format/<operation>', methods=['GET', 'POST'])
+def create_bible_format_route(operation):
+    allowed_operations = ['create_bible_format', 'other_church']
+
+    if operation not in allowed_operations:
+        flash('알 수 없는 작업이 선택되었습니다.', 'danger')
+        return redirect(url_for('create_bible_menu'))
+
     if request.method == 'POST':
         # 폼 데이터 가져오기
         text_file = request.files.get('text_file')
         ppt_title = request.form.get('ppt_title')
         version_set = request.form.get('version_set')
 
-        # 유효성 검사
         if not text_file or text_file.filename == '':
             flash('텍스트 파일을 선택해주세요.', 'warning')
             return redirect(request.url)
         if not allowed_file(text_file.filename, ALLOWED_TEXT_EXTENSIONS):
-            flash('허용되지 않은 파일 형식입니다. .txt 파일만 업로드할 수 있습니다.', 'warning')
+            flash('허용되지 않은 파일 형식입니다. .txt, .rtf 파일만 업로드할 수 있습니다.', 'warning')
             return redirect(request.url)
         if not version_set:
             flash('버전을 선택해주세요.', 'warning')
@@ -91,56 +134,55 @@ def create_bible_format_route():
             flash('PPT 제목을 입력해주세요.', 'warning')
             return redirect(request.url)
 
-        # 고유한 폴더 이름 생성 (UUID 사용) - 필요 시 사용
+        # 고유한 폴더 이름 생성 (UUID 사용)
         unique_id = str(uuid.uuid4())
-
-        # 업로드된 텍스트 파일 저장
         text_filename = secure_filename(text_file.filename)
         local_text_path = os.path.join('/tmp', f"{unique_id}_{text_filename}")
         text_file.save(local_text_path)
 
         try:
-            # 선택한 번역본 폴더 경로 설정
             selected_version_path = os.path.join(app.config['BIBLE_PPT_FOLDER'], version_set)
             if not os.path.isdir(selected_version_path):
                 flash('선택한 버전의 파일이 존재하지 않습니다.', 'danger')
                 return redirect(request.url)
 
-            logging.info(f"Selected version path: {selected_version_path}")
+            if operation == 'create_bible_format':
+                cbf = ChangeBibleFormat(
+                    text_file_path=local_text_path,
+                    bible_path=selected_version_path,
+                    output_path='/tmp',
+                    ppt_title=ppt_title
+                )
+                cbf.create_ppt_file()
 
-            # ChangeBibleFormat 인스턴스 생성 및 PPT 병합 실행
-            cbf = ChangeBibleFormat(
-                text_file_path=local_text_path,
-                bible_path=selected_version_path,
-                output_path='/tmp',
-                ppt_title=ppt_title
-            )
-            cbf.create_ppt_file()
+            elif operation == 'other_church':
+                cbf2 = ChangeBibleFormat2(
+                    text_file_path=local_text_path,
+                    bible_path=selected_version_path,
+                    output_path='/tmp',
+                    ppt_title=ppt_title
+                )
+                cbf2.create_ppt_file()
 
-            # 생성된 PPT 파일 경로
             ppt_filename = f"{ppt_title}.pptx"
             local_ppt_path = os.path.join('/tmp', ppt_filename)
 
             if os.path.exists(local_ppt_path):
-                # PPT 파일을 GCS에 업로드
                 gcs_blob_name = f"output/{ppt_filename}"
-                gcs_url = upload_to_gcs(local_ppt_path, gcs_blob_name)
+                gcs_url = upload_to_gcs(GCS_BUCKET, local_ppt_path, gcs_blob_name)
 
-                flash('PPT 파일이 성공적으로 생성되었습니다.', 'success')
-                return redirect(gcs_url)  # GCS URL로 리디렉션하여 다운로드
+                return redirect(gcs_url)
             else:
                 flash('PPT 파일 생성에 실패했습니다.', 'danger')
-                return redirect(request.url)
+                return redirect(url_for('create_bible_menu'))
 
         except Exception as e:
             logging.error(f"에러 발생: {e}")
             flash(f"에러 발생: {e}", 'danger')
             return redirect(request.url)
 
-    # GET 요청 시 번역본 목록 가져오기
     version_sets = get_version_sets()
-    logging.info(f"versions passed to template: {version_sets}")
-    return render_template('create_bible_format.html', version_sets=version_sets)
+    return render_template('create_bible_operations.html', operation=operation, version_sets=version_sets)
 
 # ChangeLyrics 메인 메뉴 라우트
 @app.route('/change_lyrics', methods=['GET'])
@@ -175,7 +217,7 @@ def change_lyrics_route(operation):
             flash('텍스트 파일을 선택해주세요.', 'warning')
             return redirect(request.url)
         if not allowed_file(text_file.filename, ALLOWED_TEXT_EXTENSIONS):
-            flash('허용되지 않은 파일 형식입니다. .txt 파일만 업로드할 수 있습니다.', 'warning')
+            flash('허용되지 않은 파일 형식입니다. .txt, .rtf 파일만 업로드할 수 있습니다.', 'warning')
             return redirect(request.url)
 
         # 특정 작업에 따라 PPT 파일이 필요한지 확인
@@ -228,9 +270,8 @@ def change_lyrics_route(operation):
             local_ppt_output_path = os.path.join('/tmp', ppt_output_filename)
 
             if os.path.exists(local_ppt_output_path):
-                # PPT 파일을 GCS에 업로드
                 gcs_blob_name = f"output/{ppt_output_filename}"
-                gcs_url = upload_to_gcs(local_ppt_output_path, gcs_blob_name)
+                gcs_url = upload_to_gcs(GCS_BUCKET, local_ppt_output_path, gcs_blob_name)
 
                 flash('PPT 파일이 성공적으로 생성되었습니다.', 'success')
                 return redirect(gcs_url)  # GCS URL로 리디렉션하여 다운로드
@@ -246,7 +287,6 @@ def change_lyrics_route(operation):
     # GET 요청 시 작업에 따라 필요한 정보만 제공
     return render_template('change_lyrics_operations.html', operation=operation)
 
-
 # PPT 파일 다운로드 라우트 (필요 시)
 @app.route('/download/<filename>')
 def download_file(filename):
@@ -257,4 +297,4 @@ if __name__ == '__main__':
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     os.makedirs(BIBLE_PPT_FOLDER, exist_ok=True)
     os.makedirs('/tmp', exist_ok=True)
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5050)), debug=False)
+    app.run(host='0.0.0.0', port=5050, debug=True)

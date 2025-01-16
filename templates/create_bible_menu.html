@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>말씀 PPT 생성</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.3.0/css/all.min.css"
+    />
+</head>
+<body>
+    <div class="container">
+        <div class="title">
+            <h2>말씀 PPT 생성</h2>
+            <button class="cancel" onclick="window.location.href='{{ url_for('index') }}'">
+		<i class="fa-solid fa-xmark fa-2xl"></i>
+	    </button>
+        </div>
+        <div class="menu">
+            <a href="{{ url_for('create_bible_format_route', operation='create_bible_format') }}" class="request-type">오메가 말씀 PPT 생성</a>
+            <a href="{{ url_for('create_bible_format_route', operation='other_church') }}" class="request-type">기타 형식 생성</a>
+        </div>
+    </div>
+</body>
+</html>

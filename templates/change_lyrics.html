@@ -1,62 +1,24 @@
+<!-- templates/change_lyrics.html -->
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <title>가사 PPT 생성</title>
-    <style>
-        /* 기존 스타일과 유사하게 유지 */
-        body {
-            font-family: '나눔고딕', sans-serif;
-            background-color: #f0f8ff;
-            padding: 20px;
-        }
-        .container {
-            max-width: 600px;
-            margin: auto;
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        .btn {
-            background-color: lightblue;
-            color: white;
-            padding: 15px 25px;
-            margin: 10px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            width: 100%;
-        }
-        .btn:hover {
-            background-color: deepskyblue;
-        }
-        .alert {
-            padding: 10px;
-            margin-bottom: 15px;
-            border-radius: 5px;
-        }
-        .alert-warning {
-            background-color: #ff9800;
-            color: white;
-        }
-        .alert-danger {
-            background-color: #f44336;
-            color: white;
-        }
-        .alert-success {
-            background-color: #4caf50;
-            color: white;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.3.0/css/all.min.css"
+    />
 </head>
 <body>
     <div class="container">
-        <h2>가사 PPT 생성</h2>
-
+        <div class="title">
+            <h2>가사 PPT 생성</h2>
+            <button class="cancel" onclick="window.location.href='{{ url_for('index') }}'">
+                <i class="fa-solid fa-xmark fa-2xl"></i>
+            </button>
+        </div>
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
@@ -67,14 +29,15 @@
           {% endif %}
         {% endwith %}
 
-        <a href="{{ url_for('change_lyrics_route', operation='change_lyrics') }}" class="btn">가사 변경</a>
-        <a href="{{ url_for('change_lyrics_route', operation='change_only_korean_lyrics') }}" class="btn">기존 ppt에서 한글 가사만 변경</a>
-        <a href="{{ url_for('change_lyrics_route', operation='change_only_english_lyrics') }}" class="btn">기존 ppt에서 영어 가사만 변경</a>
-        <a href="{{ url_for('change_lyrics_route', operation='create_lyrics') }}" class="btn">가사 PPT 생성</a>
-        <a href="{{ url_for('change_lyrics_route', operation='create_only_korean_lyrics') }}" class="btn">한글 가사 PPT 생성</a>
-        <a href="{{ url_for('change_lyrics_route', operation='create_only_english_lyrics') }}" class="btn">영어 가사 PPT 생성</a>
-        <a href="{{ url_for('change_lyrics_route', operation='create_seoul_form') }}" class="btn">서울 형식 PPT 생성</a>
-        <a href="{{ url_for('index') }}" class="btn" style="background-color: grey; margin-top: 10px;">메인 메뉴로 돌아가기</a>
+        <div class="menu">
+            <a href="{{ url_for('change_lyrics_route', operation='change_lyrics') }}" class="request-type">가사 변경</a>
+            <a href="{{ url_for('change_lyrics_route', operation='change_only_korean_lyrics') }}" class="request-type">기존 ppt에서 한글 가사만 변경</a>
+            <a href="{{ url_for('change_lyrics_route', operation='change_only_english_lyrics') }}" class="request-type">기존 ppt에서 영어 가사만 변경</a>
+            <a href="{{ url_for('change_lyrics_route', operation='create_lyrics') }}" class="request-type">가사 PPT 생성</a>
+            <a href="{{ url_for('change_lyrics_route', operation='create_only_korean_lyrics') }}" class="request-type">한글 가사 PPT 생성</a>
+            <a href="{{ url_for('change_lyrics_route', operation='create_only_english_lyrics') }}" class="request-type">영어 가사 PPT 생성</a>
+            <a href="{{ url_for('change_lyrics_route', operation='create_seoul_form') }}" class="request-type">서울 형식 PPT 생성</a>
+        </div>
     </div>
 </body>
 </html>

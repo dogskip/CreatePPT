@@ -5,6 +5,7 @@ from pptx import Presentation
 from pptx.enum.text import PP_ALIGN
 from pptx.util import Pt, Inches
 from pptx.dml.color import RGBColor
+from striprtf.striprtf import rtf_to_text
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -118,40 +119,50 @@ class ChangeBibleFormat:
 
     def spacing_name(self):
         with open(self.text_file_path, 'r', encoding='utf-8') as f:
-            text = f.read()
-        find_pattern = r'[가-힣]+\s?\d+:\d+(?:-\d+(?:,\d+(?:-\d+)?)?|,\d+(?:-\d+)?)?'
+            if self.text_file_path.endswith(".rtf"):
+                content = f.read()
+                text = rtf_to_text(content)
+            else:
+                text = f.read()
+        find_pattern = r'^(?!.*오늘의 말씀 나눔)\d+\.\s.*$|[가-힣]+\s?\d+:\d+(?:-\d+(?:,\d+(?:-\d+)?)?|,\d+(?:-\d+)?)?'
         sub_pattern = r'([가-힣]+)\s?(\d+:\d+(?:-\d+(?:,\d+(?:-\d+)?)?|,\d+(?:-\d+)?)?)'
         replacement = r'\1 \2'
         spacing_verses = []
-        verses = re.findall(find_pattern, text)
+        verses = re.findall(find_pattern, text, re.MULTILINE)
         for verse in verses:
-            spacing = re.sub(sub_pattern, replacement, verse)
-            spacing_verses.append(spacing)
+            if re.match(r'[가-힣]+', verse):
+                spacing = re.sub(sub_pattern, replacement, verse)
+                spacing_verses.append(spacing)
+            else:
+                spacing_verses.append(verse)
         return spacing_verses
 
     def expanding_name(self):
         spacing_verses = self.spacing_name()
         expanded_verses = []
         for verse in spacing_verses:
-            replaced = False
-            book = verse.split(" ")[0]
-            for abbrev, full_name in self.book_names.items():
-                if book == abbrev:
-                    expanded = verse.replace(abbrev, full_name, 1)
-                    if len(expanded) > len(full_name) and expanded[len(full_name)] != ' ':
-                        expanded = full_name + ' ' + expanded[len(full_name):]
-                    expanded_verses.append(expanded)
-                    replaced = True
-                    break
-                elif book == full_name:
-                    expanded = verse
-                    if len(expanded) > len(full_name) and expanded[len(full_name)] != ' ':
-                        expanded = full_name + ' ' + expanded[len(full_name):]
-                    expanded_verses.append(expanded)
-                    replaced = True
-                    break
-            if not replaced:
-                raise ValueError(f"Unknown name : {verse}")
+            if re.match(r'\d+', verse):
+                expanded_verses.append(verse)
+            else:
+                replaced = False
+                book = verse.split(" ")[0]
+                for abbrev, full_name in self.book_names.items():
+                    if book == abbrev:
+                        expanded = verse.replace(abbrev, full_name, 1)
+                        if len(expanded) > len(full_name) and expanded[len(full_name)] != ' ':
+                            expanded = full_name + ' ' + expanded[len(full_name):]
+                        expanded_verses.append(expanded)
+                        replaced = True
+                        break
+                    elif book == full_name:
+                        expanded = verse
+                        if len(expanded) > len(full_name) and expanded[len(full_name)] != ' ':
+                            expanded = full_name + ' ' + expanded[len(full_name):]
+                        expanded_verses.append(expanded)
+                        replaced = True
+                        break
+                if not replaced:
+                    raise ValueError(f"Unknown name : {verse}")
         return expanded_verses
 
     def create_ppt_path_and_slide(self):
@@ -160,54 +171,59 @@ class ChangeBibleFormat:
         full_bible_names = []
         expanded_verses = self.expanding_name()
         for expanded_verse in expanded_verses:
-            if re.match(self.patterns.get("complex_range_with_comma"), expanded_verse):
-                match = re.match(self.patterns.get("complex_range_with_comma"), expanded_verse)
-                book, chapter, start_verse, end_verse, addition_start_verse, addition_end_verse = match.groups()
-                start_verse, end_verse, addition_start_verse, addition_end_verse = int(start_verse), int(end_verse), int(addition_start_verse), int(addition_end_verse)
-                slide_range = list(range(start_verse, end_verse + 1)) + list(range(addition_start_verse, addition_end_verse + 1))
-            elif re.match(self.patterns.get("verse_range_with_comma"), expanded_verse):
-                match = re.match(self.patterns.get("verse_range_with_comma"), expanded_verse)
-                book, chapter, start_verse, end_verse, addition_verse = match.groups()
-                start_verse, end_verse, addition_verse = int(start_verse), int(end_verse), int(addition_verse)
-                slide_range = list(range(start_verse, end_verse + 1)) + [addition_verse]
-            elif re.match(self.patterns.get("verse_range"), expanded_verse):
-                match = re.match(self.patterns.get("verse_range"), expanded_verse)
-                book, chapter, start_verse, end_verse = match.groups()
-                start_verse, end_verse = int(start_verse), int(end_verse)
-                slide_range = list(range(start_verse, end_verse + 1))
-            elif re.match(self.patterns.get("single_verse_with_verse_range"), expanded_verse):
-                match = re.match(self.patterns.get("single_verse_with_verse_range"), expanded_verse)
-                book, chapter, verse, addition_start_verse, addition_end_verse = match.groups()
-                verse, addition_start_verse, addition_end_verse = int(verse), int(addition_start_verse), int(addition_end_verse)
-                slide_range = [verse] + list(range(addition_start_verse, addition_end_verse + 1))
-            elif re.match(self.patterns.get("single_verse_with_comma"), expanded_verse):
-                match = re.match(self.patterns.get("single_verse_with_comma"), expanded_verse)
-                book, chapter, verse, addition_verse = match.groups()
-                verse, addition_verse = int(verse), int(addition_verse)
-                slide_range = [verse, addition_verse]
-            elif re.match(self.patterns.get("single_verse"), expanded_verse):
-                match = re.match(self.patterns.get("single_verse"), expanded_verse)
-                book, chapter, start_verse = match.groups()
-                start_verse = int(start_verse)
-                slide_range = [start_verse]
+            if re.match(r'\d+', expanded_verse):
+                path_list.append("")
+                s_range.append("")
+                full_bible_names.append("")
             else:
-                raise ValueError("Invalid verse format. Use 'Book Chapter:Verse-Verse'.")
+                if re.match(self.patterns.get("complex_range_with_comma"), expanded_verse):
+                    match = re.match(self.patterns.get("complex_range_with_comma"), expanded_verse)
+                    book, chapter, start_verse, end_verse, addition_start_verse, addition_end_verse = match.groups()
+                    start_verse, end_verse, addition_start_verse, addition_end_verse = int(start_verse), int(end_verse), int(addition_start_verse), int(addition_end_verse)
+                    slide_range = list(range(start_verse, end_verse + 1)) + list(range(addition_start_verse, addition_end_verse + 1))
+                elif re.match(self.patterns.get("verse_range_with_comma"), expanded_verse):
+                    match = re.match(self.patterns.get("verse_range_with_comma"), expanded_verse)
+                    book, chapter, start_verse, end_verse, addition_verse = match.groups()
+                    start_verse, end_verse, addition_verse = int(start_verse), int(end_verse), int(addition_verse)
+                    slide_range = list(range(start_verse, end_verse + 1)) + [addition_verse]
+                elif re.match(self.patterns.get("verse_range"), expanded_verse):
+                    match = re.match(self.patterns.get("verse_range"), expanded_verse)
+                    book, chapter, start_verse, end_verse = match.groups()
+                    start_verse, end_verse = int(start_verse), int(end_verse)
+                    slide_range = list(range(start_verse, end_verse + 1))
+                elif re.match(self.patterns.get("single_verse_with_verse_range"), expanded_verse):
+                    match = re.match(self.patterns.get("single_verse_with_verse_range"), expanded_verse)
+                    book, chapter, verse, addition_start_verse, addition_end_verse = match.groups()
+                    verse, addition_start_verse, addition_end_verse = int(verse), int(addition_start_verse), int(addition_end_verse)
+                    slide_range = [verse] + list(range(addition_start_verse, addition_end_verse + 1))
+                elif re.match(self.patterns.get("single_verse_with_comma"), expanded_verse):
+                    match = re.match(self.patterns.get("single_verse_with_comma"), expanded_verse)
+                    book, chapter, verse, addition_verse = match.groups()
+                    verse, addition_verse = int(verse), int(addition_verse)
+                    slide_range = [verse, addition_verse]
+                elif re.match(self.patterns.get("single_verse"), expanded_verse):
+                    match = re.match(self.patterns.get("single_verse"), expanded_verse)
+                    book, chapter, start_verse = match.groups()
+                    start_verse = int(start_verse)
+                    slide_range = [start_verse]
+                else:
+                    raise ValueError("Invalid verse format. Use 'Book Chapter:Verse-Verse'.")
 
-            book_path = self.change_book_names_to_path(book)
-            ppt_file_path = os.path.join(self.bible_path, book_path, f"{book}{chapter}장.pptx")
-            if not os.path.exists(ppt_file_path):
-                logging.error(f"PPT 파일이 존재하지 않습니다: {ppt_file_path}")
-                raise FileNotFoundError(f"PPT 파일이 존재하지 않습니다: {ppt_file_path}")
-            path_list.append(ppt_file_path)
-            s_range.append(slide_range)
+                book_path = self.change_book_names_to_path(book)
+                ppt_file_path = os.path.join(self.bible_path, book_path, f"{book}{chapter}장.pptx")
+                if not os.path.exists(ppt_file_path):
+                    logging.error(f"PPT 파일이 존재하지 않습니다: {ppt_file_path}")
+                    raise FileNotFoundError(f"PPT 파일이 존재하지 않습니다: {ppt_file_path}")
+                path_list.append(ppt_file_path)
+                s_range.append(slide_range)
 
-            split_name = expanded_verse.split(" ")
-            full_bible_name = ""
-            for korean_name, english_name in self.english_book_names.items():
-                if split_name[0] == korean_name:
-                    full_bible_name = f"{split_name[0]} {english_name} | {' '.join(split_name[1:])}"
-                    break
-            full_bible_names.append(full_bible_name)
+                split_name = expanded_verse.split(" ")
+                full_bible_name = ""
+                for korean_name, english_name in self.english_book_names.items():
+                    if split_name[0] == korean_name:
+                        full_bible_name = f"{split_name[0]} {english_name} | {' '.join(split_name[1:])}"
+                        break
+                full_bible_names.append(full_bible_name)
 
         return path_list, s_range, full_bible_names, expanded_verses
 
@@ -245,6 +261,22 @@ class ChangeBibleFormat:
                             run.font.bold = True  # 굵게 설정
                             run.font.color.rgb = RGBColor(255, 255, 255) # 글자 색
 
+    def create_header(self, merged_ppt, left, top, width, height, expanded_verse, font_size):
+        header_slide_layout = merged_ppt.slide_layouts[6]
+        header_slide = merged_ppt.slides.add_slide(header_slide_layout)
+        left = Inches(float(left))
+        top = Inches(float(top))
+        width = Inches(float(width))
+        height = Inches(float(height))
+        header_textbox = header_slide.shapes.add_textbox(left, top, width, height)
+        header = header_textbox.text_frame
+        header.text = expanded_verse
+        header.paragraphs[0].alignment = PP_ALIGN.CENTER
+        header.paragraphs[0].font.color.rgb = RGBColor(255, 255, 255)  # 흰색
+        header.paragraphs[0].font.size = Pt(int(font_size))
+        header.paragraphs[0].font.name = '나눔고딕 ExtraBold'
+        header.paragraphs[0].bold = True
+
     def create_ppt_file(self):
         try:
             path_list, s_range, full_bible_names, expanded_verses = self.create_ppt_path_and_slide()
@@ -254,46 +286,48 @@ class ChangeBibleFormat:
             merged_ppt.slide_height = Inches(7.5)
 
             for ppt_path, slide_range, full_bible_name, expanded_verse in zip(path_list, s_range, full_bible_names, expanded_verses):
-                source_prs = Presentation(ppt_path)
+                if ppt_path == '':
+                    self.create_header(merged_ppt=merged_ppt,left=0,top=2.96,width=13.33,height=1.58,font_size=44,expanded_verse=expanded_verse)
+                    self.create_header(merged_ppt=merged_ppt,left=4.58,top=0.84,width=8.76,height=1.11,font_size=30,expanded_verse=expanded_verse)
 
-                # 제목 슬라이드 추가
-                title_slide_layout = merged_ppt.slide_layouts[6]
-                title_slide = merged_ppt.slides.add_slide(title_slide_layout)
-                left = Inches(1.67)
-                top = Inches(2.85)
-                width = Inches(10.00)
-                height = Inches(1.81)
-                textbox = title_slide.shapes.add_textbox(left, top, width, height)
-                title = textbox.text_frame
-                title.text = expanded_verse
-                title.paragraphs[0].alignment = PP_ALIGN.CENTER
-                title.paragraphs[0].font.color.rgb = RGBColor(255, 255, 255)  # 흰색
-                title.paragraphs[0].font.size = Pt(80)
-                title.paragraphs[0].font.name = '나눔고딕'
-                title.paragraphs[0].bold = True
+                else:
+                    source_prs = Presentation(ppt_path)
 
-                for slide_num in slide_range:
-                    if slide_num < 1 or slide_num > len(source_prs.slides):
-                        logging.warning(f"슬라이드 번호 {slide_num}이(가) {ppt_path}에 없습니다.")
-                        continue
-                    source_slide = source_prs.slides[slide_num - 1]
-                    try:
-                        self.copy_slide(merged_ppt, source_slide, full_bible_name)
-                        logging.info(f"슬라이드 {slide_num}을(를) 성공적으로 복사했습니다.")
-                    except Exception as e:
-                        logging.error(f"슬라이드 {slide_num} 복사 중 오류 발생: {e}")
+                    # 제목 슬라이드 추가
+                    title_slide_layout = merged_ppt.slide_layouts[6]
+                    background = title_slide_layout.background
+                    fill = background.fill
+                    fill.solid()
+                    fill.fore_color.rgb = RGBColor(0, 0, 0)
+                    title_slide = merged_ppt.slides.add_slide(title_slide_layout)
+                    left = Inches(1.67)
+                    top = Inches(2.85)
+                    width = Inches(10.00)
+                    height = Inches(1.81)
+                    textbox = title_slide.shapes.add_textbox(left, top, width, height)
+                    title = textbox.text_frame
+                    title.text = expanded_verse
+                    title.paragraphs[0].alignment = PP_ALIGN.CENTER
+                    title.paragraphs[0].font.color.rgb = RGBColor(255, 255, 255)  # 흰색
+                    title.paragraphs[0].font.size = Pt(100)
+                    title.paragraphs[0].font.name = '나눔고딕 ExtraBold'
+                    title.paragraphs[0].bold = True
 
-            # 모든 슬라이드의 배경 색상 변경
-            for slide in merged_ppt.slides:
-                background = slide.background
-                fill = background.fill
-                fill.solid()
-                fill.fore_color.rgb = RGBColor(0, 0, 0)  # 검은색
+                    for slide_num in slide_range:
+                        if slide_num < 1 or slide_num > len(source_prs.slides):
+                            logging.warning(f"슬라이드 번호 {slide_num}이(가) {ppt_path}에 없습니다.")
+                            continue
+                        source_slide = source_prs.slides[slide_num - 1]
+                        try:
+                            self.copy_slide(merged_ppt, source_slide, full_bible_name)
+                            logging.info(f"슬라이드 {slide_num}을(를) 성공적으로 복사했습니다.")
+                        except Exception as e:
+                            logging.error(f"슬라이드 {slide_num} 복사 중 오류 발생: {e}")
 
-            # 최종 저장
-            save_path = os.path.join(self.output_path, f"{self.ppt_title}.pptx")
-            merged_ppt.save(save_path)
-            logging.info(f"PPT가 성공적으로 저장되었습니다: {save_path}")
+                # 최종 저장
+                save_path = os.path.join(self.output_path, f"{self.ppt_title}.pptx")
+                merged_ppt.save(save_path)
+                logging.info(f"PPT가 성공적으로 저장되었습니다: {save_path}")
 
         except Exception as e:
             logging.error(f"에러 발생: {e}")
